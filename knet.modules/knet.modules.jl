@@ -329,9 +329,9 @@ function set_mode!(s, mode)
    end
 end
 
-# The sequental container
+# The Sequential container
 #=For instance
-   cnn = Sequental(
+   cnn = Sequential(
       Conv4(3, 3, 3, 5),
       relu,
       pool,
@@ -341,16 +341,16 @@ end
       Linear(...)
    )
 =#
-type Sequental <: Container
+type Sequential <: Container
    layers::Array{Any, 1}
-   Sequental(layers...) = new([l for l in layers])
+   Sequential(layers...) = new([l for l in layers])
 end
 
-function layers(s::Sequental)
+function layers(s::Sequential)
    return s.layers
 end
 
-function forward(context, s::Sequental, x)
+function forward(context, s::Sequential, x)
    o = x
    for l in s.layers
       if isa(l, Module)
@@ -364,14 +364,14 @@ function forward(context, s::Sequental, x)
    return o
 end
 
-function add!(s::Sequental, m...)
+function add!(s::Sequential, m...)
    push!(s.layers, m...)
    return s
 end
 
 
 #= rescon = Table(+,
-   Sequental(Conv4(...), BN(...), relu, Conv4(...), BN(...), relu),
+   Sequential(Conv4(...), BN(...), relu, Conv4(...), BN(...), relu),
    Shortcut(...)
 )=#
 type Table <: Container
@@ -400,6 +400,7 @@ end
 
 
 #---Recurrent modules---
+
 abstract AbstractRNN <: Module
 
 function reset_state!(rnn::AbstractRNN)
@@ -410,6 +411,9 @@ function hidden_state(rnn::AbstractRNN)
    AutoGrad.getval(rnn.history[end])
 end
 
-type LSTM <: AbstractRNN
+# To be continued
+#=type LSTM <: AbstractRNN
    history
 end
+...
+=#
