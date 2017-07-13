@@ -124,30 +124,53 @@ macro run(m, args...)
    Expr(:call, forward, Expr(:call, get_active_parameter_context), m, args...)
 end
 
-function parameters(m::Module)
-   function _parameters(m, paramlist)
-      if isa(m, Module)
-         for fn in fieldnames(m)
-            _parameters(getfield(m, fn), paramlist)
-         end
-      elseif isa(m, Array) || isa(m, Tuple)
-         for l in m
-            _parameters(l, paramlist)
-         end
-      elseif isa(m, Associative)
-         for v in values(m)
-            _parameters(l, v)
-         end
-      elseif isa(m, Parameter)
-         push!(paramlist, m)
-      else
-         return
+function _populate_recursive(m, list, match_type)
+   if isa(m, Module)
+      for fn in fieldnames(m)
+         _populate_recursive(getfield(m, fn), list, match_type)
       end
+   elseif isa(m, Array) || isa(m, Tuple)
+      for l in m
+         _populate_recursive(l, list, match_type)
+      end
+   elseif isa(m, Associative)
+      for v in values(m)
+         _populate_recursive(v, list, match_type)
+      end
+   elseif isa(m, match_type)
+      push!(list, m)
+   else
+      return
    end
+end
+
+function parameters(m::Module)
    res = []
-   _parameters(m, res)
+   _populate_recursive(m, res, Parameter)
    return res
 end
+
+function submodules(m::Module)
+   res = []
+   _populate_recursive(m, res, Module)
+   return res
+end
+
+
+function set_mode!(m::Module, mode)
+   if :mode in fieldnames(m)
+      s.mode = mode
+   end
+   for sm in submodules(m)
+      if :mode in fieldnames(m)
+         m.mode = mode
+      end
+   end
+end
+
+training!(m::Module) = set_mode!(m::Module, :train)
+
+testing!(m::Module) = set_mode!(m::Module, :train)
 
 
 # loss: (ypred, ygold) -> scalar
@@ -303,18 +326,6 @@ type BatchNorm4 <: AbstractBatchNorm
       end
 end
 
-function set_mode!(s::Module, mode)
-   fnames = fieldnames(s)
-   if :mode in fnames
-      s.mode = mode
-   end
-   for f in fnames
-      fv = getfield(s, f)
-      if isa(fv, Module)
-         set_mode!(fv, mode)
-      end
-   end
-end
 
 
 abstract Container <: Module
@@ -323,11 +334,6 @@ function layers(c::Container)
    error("layers is not implemented for type ", typeof(c))
 end
 
-function set_mode!(s, mode)
-   for l in layers(s)
-      set_mode!(l, mode)
-   end
-end
 
 # The Sequential container
 #=For instance
