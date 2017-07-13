@@ -125,6 +125,10 @@ macro run(m, args...)
 end
 
 function _populate_recursive(m, list, match_type)
+   if isa(m, match_type)
+      push!(list, m)
+   end
+
    if isa(m, Module)
       for fn in fieldnames(m)
          _populate_recursive(getfield(m, fn), list, match_type)
@@ -137,8 +141,6 @@ function _populate_recursive(m, list, match_type)
       for v in values(m)
          _populate_recursive(v, list, match_type)
       end
-   elseif isa(m, match_type)
-      push!(list, m)
    else
       return
    end
@@ -150,6 +152,7 @@ function parameters(m::Module)
    return res
 end
 
+# Contains itself
 function submodules(m::Module)
    res = []
    _populate_recursive(m, res, Module)
@@ -158,19 +161,16 @@ end
 
 
 function set_mode!(m::Module, mode)
-   if :mode in fieldnames(m)
-      s.mode = mode
-   end
    for sm in submodules(m)
-      if :mode in fieldnames(m)
-         m.mode = mode
+      if :mode in fieldnames(sm)
+         sm.mode = mode
       end
    end
 end
 
-training!(m::Module) = set_mode!(m::Module, :train)
+training!(m::Module) = set_mode!(m, :train)
 
-testing!(m::Module) = set_mode!(m::Module, :train)
+testing!(m::Module) = set_mode!(m, :test)
 
 
 # loss: (ypred, ygold) -> scalar
