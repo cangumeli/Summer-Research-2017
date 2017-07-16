@@ -113,11 +113,11 @@ resnet164(nclasses=10) = PreResNetCifarDeep(164, nclasses)
 resnet1001(nclasses=10) = PreResNetCifarDeep(1001, nclasses)
 
 type PreResNet <: ResNetBase
-   config::Config
+   config::ResNetConfig
    inp::Module
    blocks::Array{Module, 1}
    out::Module
-   function PreResNet(config::Config; nclasses=1000)
+   function PreResNet(config::ResNetConfig; nclasses=1000)
       inp = Sequential(
          Conv4(7, 7, 3, 64; padding=3, stride=2),
          BatchNorm4(64),
@@ -147,9 +147,9 @@ type PreResNet <: ResNetBase
 end
 
 # TODO: support pretrained model loading
-preresnet18() = PreResNet(Config(BasicBlockPre, [2, 2, 2, 2], basic_channels))
-preresnet34() = PreResNet(Config(BasicBlockPre, [3, 4, 6, 3], basic_channels))
-preresnet50() = PreResNet(Config(BottleneckPre, [3, 4, 6, 3], bottleneck_channels))
-preresnet101() = PreResNet(Config(BottleneckPre, [3, 4, 23, 3], bottleneck_channels))
-preresnet152() = PreResNet(Config(BottleneckPre, [3, 8, 36, 3], bottleneck_channels))
-resnet200() = PreResNet(Config(BottleneckPre, [3, 24, 36, 3], bottleneck_channels))
+preresnet18() = PreResNet(ResNetConfig(BasicBlockPre, [2, 2, 2, 2], basic_channels))
+preresnet34() = PreResNet(ResNetConfig(BasicBlockPre, [3, 4, 6, 3], basic_channels))
+preresnet50() = PreResNet(ResNetConfig(BottleneckPre, [3, 4, 6, 3], bottleneck_channels))
+preresnet101() = PreResNet(ResNetConfig(BottleneckPre, [3, 4, 23, 3], bottleneck_channels))
+preresnet152() = PreResNet(ResNetConfig(BottleneckPre, [3, 8, 36, 3], bottleneck_channels))
+resnet200() = PreResNet(ResNetConfig(BottleneckPre, [3, 24, 36, 3], bottleneck_channels))
