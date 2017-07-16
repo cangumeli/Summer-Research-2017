@@ -222,7 +222,7 @@ end
 
 function forward(context, c::Conv4, x)
    #w, b = c.weight, c.bias
-   o = @po conv4(c.weight, x; c.cfg...)
+   o = @po conv4(c.weight, x; mode=1, c.cfg...)
    if c.bias !== nothing
       o = @po o .+ c.bias
    end
@@ -266,13 +266,11 @@ function forward(context, bn::AbstractBatchNorm, x)
       for i in red_dims
          m *= size(x, i)
       end
-      #foldr(*, map(d->size(x, d), 1:red_dims))
       mu = sum(x, red_dims) ./ m
       x_mu = x .- mu
       sigma2 = sumabs2(x_mu, red_dims) ./ m
       x_hat = x_mu ./ sqrt(sigma2 .+ bn.eps)
       # Update the running stats
-      # println(size(bn.running_mean), size(AutoGrad.getval(mu)))
       bn.running_mean = bn.momentum * bn.running_mean + (1 - bn.momentum) * AutoGrad.getval(mu)
       bn.running_var = bn.momentum * bn.running_var + (1 - bn.momentum) * AutoGrad.getval(sigma2)
    end
@@ -330,13 +328,14 @@ end
 type Dropout <: Module
    keep_prob::AbstractFloat
    mode::Symbol
-   Dropout(keep_prob::AbstractFloat; mode=:train) = new(keep_prob, mode)
+   noise
+   Dropout(keep_prob::AbstractFloat; mode=:train) = new(keep_prob, mode, nothing)
 end
 
 function forward(context, m::Dropout, x)
    assert(m.mode in [:train, :test])
    tx = typeof(AutoGrad.getval(x))
-   sizex = size(AutoGrad.getval(x))
+   sizex = size(x)
    etx = eltype(AutoGrad.getval(x))
    p = etx(m.keep_prob)
    if p == 0
@@ -344,8 +343,12 @@ function forward(context, m::Dropout, x)
    elseif p == 1
       x
    elseif m.mode === :train
-      flt = tx(rand(sizex) .<= p)
-      x .* flt
+      if m.noise == nothing || size(m.noise) != size(x)
+         m.noise = tx(rand(etx, sizex) .<= p)
+      else
+         copy!(m.noise, rand(sizex) .<= p)
+      end
+      x .* m.noise
    else # test mode
       p .* x
    end
