@@ -1,8 +1,17 @@
-using Knet
-include("../../knet.modules/knet.modules.jl")
+using Knet, KnetModules
+import KnetModules.forward
+# include("../../knet.modules/knet.modules.jl")
+_loader_included = false
+try # Don't crash system if weight loaders have error
+   # which is likely since it has a PyCall dependency
+   include("_resnet_weight_loader.jl")
+   _loader_included = true
+catch e
+   warn("Pretrained weight loader cannot be included:\nInfo:\n", e)
+end
 
 # TODO: support concat etc.
-type Shortcut <: Module
+type Shortcut <: KnetModule
    op
    function Shortcut(input, output, stride=1)
       use_conv = input !== output
@@ -18,12 +27,12 @@ end
 
 function forward(context, s::Shortcut, x)
    if s.op !== nothing
-      x = @mc s.op(x)
+      x = @mc s.op(x) #->forward(context,s, x)
    end
    return x
 end
 
-abstract Block <: Module
+abstract Block <: KnetModule
 
 function forward(context, b::Block, x)
    o1 = @mc b.layers(x)
@@ -32,7 +41,7 @@ function forward(context, b::Block, x)
 end
 
 type BasicBlock <: Block
-   layers::Module
+   layers::KnetModule
    shortcut::Shortcut
    function BasicBlock(input::Int, output::Int, stride::Int=1)
       layers = Sequential(
@@ -48,7 +57,7 @@ type BasicBlock <: Block
 end
 
 type Bottleneck <: Block
-   layers::Module
+   layers::KnetModule
    shortcut::Shortcut
    function Bottleneck(input::Int, output::Int, stride::Int=1)
       n = Int(output/4)
@@ -66,7 +75,7 @@ type Bottleneck <: Block
    end
 end
 
-abstract ResNetBase <: Module
+abstract ResNetBase <: KnetModule
 
 function forward(context, model::ResNetBase, x)
    # First conv
@@ -76,18 +85,18 @@ function forward(context, model::ResNetBase, x)
       # Use array for easy surgery and checking intermadiate outputs
       o = @mc block(o)
    end
+   # The output pooling and classification
    if model.out != nothing
       o = @mc model.out(o)
    end
    return o
-   # The output pooling and classification
 end
 
 type ResNetCifar <: ResNetBase
    depth::Int
-   inp::Module
+   inp::KnetModule
    blocks::Array{Block, 1}
-   out::Module
+   out::KnetModule
    function ResNetCifar(depth::Int; nclasses=10)
       n = Int((depth-2)/6)
       inp = Sequential(
@@ -123,8 +132,8 @@ ResNetConfig(block::Type, repeat::Array{Int, 1}, channels::Array{Int, 1}) =
 
 type ResNet <: ResNetBase
    config::ResNetConfig
-   inp::Module
-   blocks::Array{Module, 1}
+   inp::KnetModule
+   blocks::Array{KnetModule, 1}
    out # nullable
    function ResNet(config::ResNetConfig; nclasses=1000)
       inp = Sequential(
@@ -158,19 +167,13 @@ type ResNet <: ResNetBase
 end
 
 function create_resnet_loader()
-   _loader_included = false
+   global _loader_included
    function _pt(model, depth, opt)
       if ~opt
          return model
       end
       if ~_loader_included
-         try # Don't crash system if weight loaders have error
-            # which is likely since it has a PyCall dependency
-            include("_resnet_weight_loader.jl")
-            _loader_included = true
-         catch e
-            error("Pretrained weight loader cannot be included:\nInfo:\n", e)
-         end
+         error("Weight loader not included")
       end
       dirname = download_torch_weights(depth)
       load_torch_weights!(model, dirname)

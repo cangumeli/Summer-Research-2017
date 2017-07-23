@@ -1,7 +1,7 @@
 include("resnet.jl")
 
 #----- Preactivation Models -----
-type ShortcutPre <: Module
+type ShortcutPre <: KnetModule
    op
    function ShortcutPre(input, output, stride=1)
       use_conv = input !== output
@@ -30,7 +30,7 @@ function forward(context, block::BlockPre, x)
 end
 
 type BasicBlockPre <: BlockPre
-   layers::Module
+   layers::KnetModule
    shortcut::ShortcutPre
    function BasicBlockPre(input::Int, output::Int, stride::Int=1; first=false, last=false)
       layers = first ? Sequential() : Sequential(BatchNorm4(input), relu)
@@ -51,7 +51,7 @@ type BasicBlockPre <: BlockPre
 end
 
 type BottleneckPre <: BlockPre
-   layers::Module
+   layers::KnetModule
    shortcut::ShortcutPre
    function BottleneckPre(input::Int, output::Int, stride::Int=1; first=false, last=false)
       n = Int(output/4)
@@ -77,9 +77,9 @@ type BottleneckPre <: BlockPre
 end
 
 type PreResNetCifar <: ResNetBase
-   inp::Module
-   blocks::Array{Module, 1}
-   out::Module
+   inp::KnetModule
+   blocks::Array{KnetModule, 1}
+   out::KnetModule
    function PreResNetCifar(
          depth::Int,
          block::Type,
@@ -114,9 +114,9 @@ resnet1001(nclasses=10) = PreResNetCifarDeep(1001, nclasses)
 
 type PreResNet <: ResNetBase
    config::ResNetConfig
-   inp::Module
-   blocks::Array{Module, 1}
-   out::Module
+   inp::KnetModule
+   blocks::Array{KnetModule, 1}
+   out::KnetModule
    function PreResNet(config::ResNetConfig; nclasses=1000)
       inp = Sequential(
          Conv4(7, 7, 3, 64; padding=3, stride=2),

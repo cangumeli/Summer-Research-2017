@@ -97,7 +97,7 @@ function download_torch_weights(depth::Int; dirname="torch_weights")
    if ~haskey(urls, depth)
       error("Dept ", depth, " is not supported yet.")
    end
-   dir() = string(pwd(), "/", dirname)
+   dir() = string("./", dirname)
    uri(depth) = string(dir(), "/resnet-", depth)
    if ~isdir(dir())
       mkdir(dir())
