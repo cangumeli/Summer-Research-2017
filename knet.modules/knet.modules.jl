@@ -1,3 +1,4 @@
+# Original legacy file
 using Knet
 
 # Global context of parameters
@@ -56,7 +57,9 @@ set_value!(context::ParamContext, v::Parameter, w) = set_value!(context, v.index
 
 set_value!(v::Parameter, w) = set_value!(get_active_parameter_context(), v.index, w)
 
-get_grad(v::Parameter, grads) = grads[v.index]
+get_grad(v::Parameter, grads) = let g = grads[v.index]
+   typeof(g) == Void ? nothing : g
+end
 
 get_value(context, x) = x
 
@@ -326,31 +329,21 @@ end
 
 
 type Dropout <: Module
-   keep_prob::AbstractFloat
+   pdrop::AbstractFloat
    mode::Symbol
    noise
-   Dropout(keep_prob::AbstractFloat; mode=:train) = new(keep_prob, mode, nothing)
+   Dropout(pdrop::AbstractFloat; mode=:train) = new(pdrop, mode, nothing)
 end
 
 function forward(context, m::Dropout, x)
    assert(m.mode in [:train, :test])
    tx = typeof(AutoGrad.getval(x))
    sizex = size(x)
-   etx = eltype(AutoGrad.getval(x))
-   p = etx(m.keep_prob)
-   if p == 0
-      tx(zeros(sizex))
-   elseif p == 1
-      x
-   elseif m.mode === :train
-      if m.noise == nothing || size(m.noise) != size(x)
-         m.noise = tx(rand(etx, sizex) .<= p)
-      else
-         copy!(m.noise, rand(sizex) .<= p)
-      end
-      x .* m.noise
-   else # test mode
-      p .* x
+   p = eltype(x)(m.pdrop)
+   if m.mode == :train
+      dropout(x, p)
+   else
+      (eltype(x)(1) - p) .* x
    end
 end
 
@@ -475,24 +468,22 @@ function forward(context, m::GRU, x, mask=nothing)
       push!(m.history, tx(h0))
    end
    ht_1 = hidden_state(m)
+   z = sigm(@mc(m.i2z(x)) .+ @mc(m.h2z(ht_1)))
+   r = sigm(@mc(m.i2r(x)) .+ @mc(m.h2r(ht_1)))
+   n = tanh(@mc(m.i2n(x)) .+ r .* @mc(m.h2n(ht_1)))
    if mask != nothing
       if ndims(mask) == 1
          mask = reshape(mask, (1, size(mask)[1]))
       end
       assert(size(mask) == (1, size(x)[2]))
-      # Remove error when sure about masking
-      # error("Masking is not supported yet")
-      #= The idea is remove the effect of padded values
+      #= The idea is destroying the effect of padded values
       from the output and freeze their state
       but I'm not sure. =#
-      z = sigm(@mc(m.i2z(x)) .+ @mc(m.h2z(ht_1))) .* mask
-      r = sigm(@mc(m.i2r(x)) .+ @mc(m.h2r(ht_1))) .* mask
-      n = tanh(@mc(m.i2n(x)) .+ r .* @mc(m.h2n(ht_1))) .* mask
+      z = z .* mask
+      r = r .* mask
+      n = n .* mask
       ht = (1 .- z) .* n .+ z .* ht_1 .+ (1 .- mask) .* ht_1
    else
-      z = sigm(@mc(m.i2z(x)) .+ @mc(m.h2z(ht_1)))
-      r = sigm(@mc(m.i2r(x)) .+ @mc(m.h2r(ht_1)))
-      n = tanh(@mc(m.i2n(x)) .+ r .* @mc(m.h2n(ht_1)))
       ht = (1 .- z) .* n .+ z .* ht_1
    end
    push!(m.history, ht)[end]
