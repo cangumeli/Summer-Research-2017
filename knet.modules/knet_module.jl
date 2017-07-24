@@ -81,8 +81,8 @@ testing!(m::KnetModule) = set_mode!(m, :test)
 
 import AutoGrad.grad
 function grad(m::KnetModule, loss)
-   _predict(w, x) = forward(w, m, x)
-   _loss(w, x, y) = loss(_predict(w, x), y)
+   _predict(w, x...) = forward(w, m, x...)
+   _loss(w, args...) = loss(_predict(w, args[1:end-1]...), args[end])
    lossgrad = grad(_loss)
-   return (x, y)->lossgrad(get_active_parameter_context(), x, y)
+   return (args...)->lossgrad(get_active_parameter_context(), args[1:end-1]..., args[end])
 end

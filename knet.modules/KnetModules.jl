@@ -42,7 +42,7 @@ module KnetModules
       # RNNs
       AbstractRNN,
       reset_state!,
-      hidden_state!,
+      hidden_state,
       GRU
 
    include("parameter.jl")

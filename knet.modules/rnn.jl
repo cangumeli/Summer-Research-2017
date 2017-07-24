@@ -44,7 +44,7 @@ function forward(context, m::GRU, x, mask=nothing)
    z = sigm(@mc(m.i2z(x)) .+ @mc(m.h2z(ht_1)))
    r = sigm(@mc(m.i2r(x)) .+ @mc(m.h2r(ht_1)))
    n = tanh(@mc(m.i2n(x)) .+ r .* @mc(m.h2n(ht_1)))
-   if mask != nothing
+   if mask != nothing && sum(mask) < length(mask)
       if ndims(mask) == 1
          mask = reshape(mask, (1, size(mask)[1]))
       end
